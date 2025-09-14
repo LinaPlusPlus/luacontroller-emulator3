@@ -1,7 +1,7 @@
 # luacontroller-emulator3
 A lua-controller emulatior focused on safety and multitasking. 
 
-the project is structured into 5 layers, 
+# the project is structured into 5 layers
 - Unblessed luacontrollers
   -  unaware of the sandbox
   -  enviornment is indistinguishable from an Luanti luacontroller
