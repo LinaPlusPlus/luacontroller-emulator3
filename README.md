@@ -1,5 +1,25 @@
 # luacontroller-emulator3
 A lua-controller emulatior focused on safety and multitasking. 
+the project is strustured into a tree. simmlar to files and folders, this tree's branches and leaves are called "Units".
+WARNING: this is a living document! expect radical changes!
+
+## Types of Units
+- Lua Controller (luac)
+  - a single unit of agency,
+  - can broadcast and receve "digiline" events
+  - runs code apon receving an event
+  - non edgecase luacontrollers run and properly sandbox the code located at the path set in their "src" property
+  - there are special luacontrollers that rather than run your code, instead run code within the kernal, there are 2 main types:
+    - a "godluac" is a special controller that can manage the domain it's paired to via it's API, making changes to the tree structure.
+    - (TODO the name may change, also not implemented yet) a "host bridge" is a luacontroller that transparently bridges
+      events it sends/receves to the Wrapper via it's paired "context channel".
+- Wires
+  - uses an internal scheduling system to wake controllers for their events
+  - TODO elaborate
+- Domains
+  - can contain child units, each addressable by a name
+  - domains cannot have multiple children of the same name
+  - getting children of a domain uses UNIX-style "path" syntax. Example: `./myChild/myGrandChild` (the './' is optional)
 
 ## the project is structured into 5 layers
 - Unblessed luacontrollers
