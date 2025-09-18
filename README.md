@@ -18,13 +18,14 @@ WARNING: this is a living document! expect radical changes!
   - wires are connected 0 or more luacontrollers
   - luacontrollers are connected 0 or more wires
   - when a luacontroller broadcasts, it enqueues a message into all connected wires
-  - when a wire is ran, it runs it's connected luacontrollers with the context of the next event in the queue.
+  - when a wire is ran, it runs it's connected luacontrollers with the context of the next event in it's queue.
   - (TODO) luacs can have firewalls for diffrent wires based on digilines channel
-  - events include a "source" and "seenby" property so each event is only receved once per controller and the broadcaster does not receve it's own message.
+  - events while in transit include a "source" and "seenby" property so each event is only receved once per controller and the broadcaster does not receve it's own message.
 - Domains
   - can contain child units, each addressable by their name
   - domains cannot have multiple children of the same name
-  - getting children of a domain uses UNIX-style "path" syntax. Example: `./myChild/myGrandChild` (the './' is optional)
+  - there is a function to rename children to become unique by appending a number
+  - refrencing children of a domain uses UNIX-style "path" syntax. Example: `./myChild/myGrandChild` (the './' is optional)
 
 ## the project is structured into 5 layers
 - Unblessed luacontrollers
