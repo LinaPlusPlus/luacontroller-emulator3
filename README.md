@@ -46,8 +46,8 @@ WARNING: this is a living document! expect radical changes!
   - responsable for executing and sandboxing luacontrollers
   - it handles the wire based communication
   - it handles the "godluac" API and the object hierarchy
-  - it handles the Kernal to Wrapper connuincation protocol, divided into context channels, each context channel corrisponds to a "hardware luacontroller"
-  - expects context channel 1 to be the command context with the "hardware luacontroller" placed at `/dev/host0`. the initlizer luac is ment to spawn `/dev/tty0` and `/dev/timer0`
+  - it handles the Kernal to Wrapper connuincation protocol, divided into context channels, each context channel corrisponds to a "host bridge"
+  - expects context channel 1 to be the command context with the "host bridge" placed at `/dev/host0`. the first luacontroller `/sysinit` is ment to setup and spawn `/dev/tty0` and `/dev/timer0`
   - (name of the "context channel" is up for debate as just "channel" conflicts with the term "digilines channel" which are also sent as part of the duplex communications to the wrapper)
   - The Kernal is expected to work without command execution on the host OS nor have direct access it's files (TODO)
      and these capabilities should be expected to be disabled by the kernal or the wrapper
