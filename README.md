@@ -20,7 +20,7 @@ WARNING: this is a living document! expect radical changes!
   - when a luacontroller broadcasts, it enqueues a message into all connected wires
   - when a wire is ran, it runs it's connected luacontrollers with the context of the next event in the queue.
   - (TODO) luacs can have firewalls for diffrent wires based on digilines channel
-  - events include a "source" and "seenby" property so each event is only receved once per controller
+  - events include a "source" and "seenby" property so each event is only receved once per controller and the broadcaster does not receve it's own message.
 - Domains
   - can contain child units, each addressable by their name
   - domains cannot have multiple children of the same name
