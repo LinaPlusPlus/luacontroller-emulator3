@@ -1,5 +1,5 @@
 --> json = 1; s()
-local json_decode,json_encecode
+_G.json_decode,_G.json_encecode = true,true;
 if true then
 --
 -- json.lua

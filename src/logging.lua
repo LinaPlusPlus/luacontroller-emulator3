@@ -1,6 +1,3 @@
---! stage { name="logging", before = {"mainloop"}, write=block}
---> pairs{json,dump} logging = 1; s();
-
 rsend = print;
 
 function send(jsonable)
@@ -17,7 +14,7 @@ end
 
 
 function log(mode, src, fmt, ...)
-    local message = fmt:format(...)
+    local message = (fmt or ""):format(...)
 
     rsend(json_encode({c=mode,src=src,msg=message}));
 end

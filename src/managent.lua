@@ -1,61 +1,3 @@
---> pairs{ } traverse_nodes = 1; s();
-
---TODO move this to another file
-local function traverse_nodes(dom,pathstr)
-    local parent,partkey = nil,nil;
-    for pathpart in string.gmatch(pathstr, "[^/]+") do
-        if pathpart == "" or pathpart == "." then
-
-        else
-            parent = dom;
-            partkey = pathpart;
-            if not parent or not parent.type == "domain" then
-                return false; -- file not found, cannot even write to parent
-            end
-            dom = parent.children[partkey];
-        end
-    end
-    return dom,parent,partkey;
-end
-
--- genarates a path to the given node from a domain
-local function shell_backtrace(node,domain)
-    local bld = {};
-    if node == domain then
-        return ".";
-    end
-    while true do
-        if not node then
-            return false;
-        end
-
-        if node == domain then
-
-            local reversed = {}
-            for i = #bld, 1, -1 do
-                reversed[#reversed + 1] = bld[i]
-            end
-
-            return table.concat(reversed,"/");
-        end
-
-        table.insert(bld,node.name);
-        node = node.domain;
-    end
-end
-
--- TODO move this to safeglobals
-local function godluac_light_permissions(godluac,source,target_path)
-    return true;
-end
-
--- TODO almost even a HACK, make permission system more strict and granular
-local function godluac_heavy_permissions(godluac,source,target_path)
-    if godluac.is_blessed_godluac then return true end
-end
-
---> pairs{ safeglobals,logging,wire_utils, traverse_nodes }  management = 1; s();
-
 function GODLUAC_OP.info(godluac,event)
 
     local target_name = tostring(event.msg.path or "/unassigned/untitled");
@@ -152,8 +94,11 @@ end
 
 function GODLUAC_OP.mkluac(godluac,event,nickname,wire)
     local msg = event.msg;
-    local path = tostring(msg.path or "/unassigned/untitled");
+    local path = msg.path and tostring(msg.path); 
+    if not path then return false,"missing 'path' argument" end
+    
     local src = msg.src and tostring(msg.src) or nil;
+    if not src then return false,"missing 'src' argument" end
     --TODO mabe some other baubles to set when creating
 
     local _mabe_existing,domain_onto,new_name = traverse_nodes(godluac.god_of,path);
@@ -187,8 +132,8 @@ end
 function GODLUAC_OP.connect(godluac,event,nickname,wire)
 
     local msg = event.msg;
-    local wire_path = tostring(msg.wire or "/unassigned/untitled");
-    local luac_path = tostring(msg.luac or "/unassigned/untitled");
+    local wire_path = tostring(msg.wire or "/unassigned/wire");
+    local luac_path = tostring(msg.luac or "/unassigned/luacontroller");
 
     local wire = traverse_nodes(godluac.god_of,wire_path);
     if not wire then

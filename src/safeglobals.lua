@@ -1,7 +1,93 @@
---! stage { name = "create_sandbox_env"}
---> pairs {dump,nameconflicts,unique_name }; safeglobals = 1; safeluac = 1; s();
+function poll_wire()
+    CURRENT_WIRE,CURRENT_WIRE_NAME = next(WIRES,CURRENT_WIRE);
+    if not CURRENT_WIRE then
+        FULL_LAPS = FULL_LAPS +1;
+        if TRACING then --TODO
+            --log("trace","sleep","full lap")
+        end
+        return
+    end
 
-local function luac_broadcast(luac,channel,response) --@ export()
+    if (CURRENT_WIRE.steps or 1) <= 0 then return end -- if you need to suspend a luac, please suspend it's wires rather than/as well as frying it.
+    if  CURRENT_WIRE.steps_dec then
+        CURRENT_WIRE.steps = CURRENT_WIRE.steps - 1;
+    end
+
+    local event = CURRENT_WIRE:pop();
+    if not event then return end
+    local tracing = TRACING or CURRENT_WIRE.tracing;
+    if tracing == true or event.channel == true then --TODO make this way better;
+        --TODO assumes everything is digilines, make it accept the other types too
+        local name = luac_name(event.source or CURRENT_WIRE) or "unknown";
+        log("trace",name,"%s","Event: "..dump(event.channel)..": "..dump(event.msg));
+    end
+
+    if CURRENT_WIRE.connections then
+        for ivoke_unit,nickname in pairs(CURRENT_WIRE.connections) do
+            HEAT = HEAT +1;
+            DID_WORK = true
+            FULL_LAPS = 0;
+            luac_envoke(ivoke_unit,event,nickname,CURRENT_WIRE);
+        end
+    end
+end
+
+
+--TODO move this to another file
+function traverse_nodes(dom,pathstr)
+    local parent,partkey = nil,nil;
+    for pathpart in string.gmatch(pathstr, "[^/]+") do
+        if pathpart == "" or pathpart == "." then
+
+        else
+            parent = dom;
+            partkey = pathpart;
+            if not parent or not parent.type == "domain" then
+                return false; -- file not found, cannot even write to parent
+            end
+            dom = parent.children[partkey];
+        end
+    end
+    return dom,parent,partkey;
+end
+
+-- genarates a path to the given node from a domain
+function shell_backtrace(node,domain)
+    local bld = {};
+    if node == domain then
+        return ".";
+    end
+    while true do
+        if not node then
+            return false;
+        end
+
+        if node == domain then
+
+            local reversed = {}
+            for i = #bld, 1, -1 do
+                reversed[#reversed + 1] = bld[i]
+            end
+
+            return table.concat(reversed,"/");
+        end
+
+        table.insert(bld,node.name);
+        node = node.domain;
+    end
+end
+
+-- TODO move this to safeglobals
+function godluac_light_permissions(godluac,source,target_path)
+    return true;
+end
+
+-- TODO almost even a HACK, make permission system more strict and granular
+function godluac_heavy_permissions(godluac,source,target_path)
+    if godluac.is_blessed_godluac then return true end
+end
+
+function luac_broadcast(luac,channel,response)
     local fufilled = {};
     if type(channel) ~= "string" then
         -- this check will be removed eventually
@@ -19,7 +105,7 @@ local function luac_broadcast(luac,channel,response) --@ export()
 end
 
 
-local function luac_name(luac) --DEPRECATED, use other methods like trace
+function luac_name(luac) --DEPRECATED, use other methods like trace
     local name = luac.name or "INVALID_LUAC"
     local domain = (luac.domain and luac.domain.global_name or "INVALID_DOMAIN")
 
@@ -31,7 +117,7 @@ local function luac_name(luac) --DEPRECATED, use other methods like trace
 end
 
 
-local function create_sandbox_env(luac)
+function create_sandbox_env(luac)
     local safe_globals = {
         assert = assert,
         error = error,
@@ -151,6 +237,21 @@ local function create_sandbox_env(luac)
         end
     end
 
+    function safe_globals.interrupt(time_secs,iid)
+        local time = time_secs and tonumber(time_secs);
+        if not time then error "interrupt expects a number" end
+        time = time * 1000;
+
+        NEXT_INTERRUPT = NEXT_INTERRUPT + 1;
+        INTERRUPTS[NEXT_INTERRUPT] = {luac=luac,iid=safe_deep_clone(iid)};
+        luac.irr_heat = (luac.irr_heat or 0) + 1
+        send {
+            c = "interrupt",
+            echo = NEXT_INTERRUPT,
+            time = time
+        }
+    end
+
     return safe_globals,things_to_print;
 end
 
@@ -178,7 +279,7 @@ function safe_deep_clone(orig, seen)
 end
 
 
-local function run_with_timeout(code, env, name, timeout)
+function run_with_timeout(code, env, name, timeout)
 
     local load_func, err;
     if type(code) == "function" then
@@ -213,7 +314,7 @@ local function run_with_timeout(code, env, name, timeout)
     return true, result
 end
 
-local function luac_get_source(luac)
+function luac_get_source(luac)
     if luac.srcstr then return luac.srcstr end
     if luac.srcpath then
         local data
@@ -263,7 +364,7 @@ local function luac_get_source(luac)
     return false,"no source provided";
 end
 
-local function luac_envoke(luac,event,nickname,wire)
+function luac_envoke(luac,event,nickname,wire)
 
     if HARD_SHUTDOWN then return end
 
@@ -392,7 +493,7 @@ local function luac_envoke(luac,event,nickname,wire)
 
 end
 
-local function new_luac(luac)
+function new_luac(luac)
     luac = luac or {};
     if not luac.name then luac.name = "luac" end
 
@@ -427,7 +528,7 @@ local function new_luac(luac)
     return luac;
 end
 
-local function new_wire(wire)
+function new_wire(wire)
     wire = Queue.new(wire or {});
     if not wire.name then wire.name = "wire" end
 
@@ -463,14 +564,14 @@ local function new_wire(wire)
     return wire;
 end
 
-local DOMAIN_NAME_USAGE = {};
+DOMAIN_NAME_USAGE = {};
 
 
 -- NOTE: only child domains should have known names to their parents
 -- parent domains can 'peek' at child domains using varying commands, this can be recursive
 -- the default setup for a domain is the god being called "domain_god" and a wire of the same name with them connected
 
-local function new_domain(name)
+function new_domain(name)
 
     local name,unumber,iname = into_unique_name(name,DOMAIN_NAME_USAGE);
 
@@ -487,11 +588,7 @@ local function new_domain(name)
     return domain;
 end
 
-
----- why are you a diffrent endpoint than the one above
---> pairs {logging,safeglobals}; wire_utils = 1; s();
-
-local function unit_move_domain(unit,domain,new_name) --TODO TESTME
+function unit_move_domain(unit,domain,new_name) --TODO TESTME
     if not domain.type == "domain" then
         return false,'parent_isnt_domain';
     end
@@ -520,14 +617,52 @@ local function unit_move_domain(unit,domain,new_name) --TODO TESTME
 
 end
 
-local function wire_connect(luac,wire,luacnick,wirenick)
+function wire_connect(luac,wire,luacnick,wirenick)
     luac.connections[wire] = luacnick or wire.name;
     wire.connections[luac] = wirenick or luac.name;
     log("trace",(luanick or "") .. " " .. luac_name(luac),"connected wire %s",(wirenick or "") .. " " .. wire.name);
 end
 
-local function wire_disconnect(luac,wire)
+function wire_disconnect(luac,wire)
     luac.connections[wire] = nil;
     wire.connections[luac] = nil;
+end
+
+function into_unique_name(name,namedb)
+    --prevent collision if `name` ends in a number
+    if not name:sub(-1):match("%D") then
+        name = name.."_"
+    end
+
+    local unumber = namedb[name] or 0;
+    namedb[name] = unumber +1;
+
+    return name,unumber,name ..tostring(unumber);
+end
+
+function resolve_name_conflicts(names)
+    local name_count = {}
+    local unique_names = {}
+
+    for i, name in ipairs(names) do
+        if not name_count[name] then
+            name_count[name] = 0
+            table.insert(unique_names, name)
+        else
+            name_count[name] = name_count[name] + 1
+            local new_name = name .. "_" .. name_count[name]
+
+            -- Make sure the new name is also unique
+            while name_count[new_name] do
+                name_count[name] = name_count[name] + 1
+                new_name = name .. "_" .. name_count[name]
+            end
+
+            name_count[new_name] = 0
+            table.insert(unique_names, new_name)
+        end
+    end
+
+    return unique_names
 end
 

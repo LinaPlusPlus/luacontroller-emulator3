@@ -1,7 +1,7 @@
 -- Simple FIFO Linked List Queue in Lua
 --> fifoq = 1; s();
 
-local Queue = {}
+_G.Queue = {}
 Queue.__index = Queue;
 
 function Queue.new(tab)

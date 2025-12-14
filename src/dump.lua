@@ -1,7 +1,5 @@
 
---> dump = 1; s();
-
-local function dump(o, indent, visited, depth, maxDepth)
+function dump(o, indent, visited, depth, maxDepth)
     indent = indent or ""
     visited = visited or {}
     depth = depth or 0

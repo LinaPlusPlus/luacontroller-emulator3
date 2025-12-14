@@ -1,55 +1,63 @@
---! stage { name="argparse", before = {"header"}, write=block }
---> pairs{logging} globals = 1; s();
---BEGIN GLOBALS
-local ARGS = {...};
 
---BEGIN Units global refrences
-local WIRES,UNITS = {},{}
-local DOMAINS = {};
-local MANAGEMENT_OP = {};
-local GODLUAC_OP = {}; --replaced with MANAGEMENT_OP?
---END
+if true then --BEGIN GLOBALS
 
---BEGIN Internal state flags
-local DID_WORK = false;
-local HEAT = 0;
-local FULL_LAPS = 0;
-local MAX_HEAT = 100;
-local TRACING = false;
-local REPL_PROMPT = "text> ";
-local WIRE_NEXT; -- TODO update wire var names to reflect
-local HARD_SHUTDOWN; -- stops all actions (basically frying all luacs) and gracefully shuts dowh the kernal and the main loop.
---END
+    --BEGIN Units global refrences
+    WIRES,UNITS = {},{}
+    DOMAINS = {};
+    MANAGEMENT_OP = {};
+    GODLUAC_OP = {}; --replaced with MANAGEMENT_OP?
+    --END
 
---BEGIN Hard coded units
-local ROOT_DOMAIN;
-local ROOT_TALK_WIRE;
-local HOST_UNIT;
-local DEV_DOMAIN;
-local UNASSIGNED_DOMAIN;
---END
+    --BEGIN Internal state flags
+    DID_WORK = false;
+    HEAT = 0;
+    FULL_LAPS = 0;
+    MAX_HEAT = 100;
+    TRACING = true;
+    REPL_PROMPT = "text> ";
+    WIRE_NEXT = nil; -- TODO update wire var names to reflect
+    HARD_SHUTDOWN = nil; -- stops all actions (basically frying all luacs) and gracefully shuts dowh the kernal and the main loop.
+    --END
 
---BEGIN allocing state
-local NEXT_INTERRUPT = 0;
-local INTERRUPTS = {};
---END
+    --BEGIN Hard coded units
+    ROOT_DOMAIN = nil;
+    ROOT_TALK_WIRE = nil;
+    HOST_UNIT = nil;
+    DEV_DOMAIN = nil;
+    UNASSIGNED_DOMAIN = nil;
+    --END
 
--- BEGIN source system
-local OVR_SOURCES = {}
+    --BEGIN allocing state
+    NEXT_INTERRUPT = 0;
+    INTERRUPTS = {};
+    --END
 
-local SOURCES = {}
+    -- BEGIN source system
+    OVR_SOURCES = {}
 
-local SRC_BUILTINS = {
-    ["sys/helloworld"]="print('hello world')",
-}
---END
+    SOURCES = {}
 
---END GLOBALS
+    SRC_BUILTINS = {
+        ["sys/helloworld"]="print('hello world')",
+    }
+    --END
+
+end --END GLOBALS
 
 --TEMP until proper arg parsing
 local PROJECT_MANIFEST = ARGS[1];
 if not PROJECT_MANIFEST then log("fail","system","usage: emulator3 <project_file>") return end
 local PROJECT_DIR = ARGS[1]:match("^(.*)[/\\]")
+
+
+local lib_dir = ...;
+require (lib_dir..".fifo")
+require (lib_dir..".dump")
+require (lib_dir..".json")
+require (lib_dir..".logging")
+require (lib_dir..".managent")
+require (lib_dir..".safeglobals")
+
 
 if true then
     local err;
@@ -68,8 +76,6 @@ end
 table.insert(SOURCES,PROJECT_DIR);
 table.insert(SOURCES,PROJECT_DIR.."/luac/");
 table.insert(OVR_SOURCES,PROJECT_DIR.."/ovr/");
-
---> pairs {safeglobals,logging,globals,poll_wire,wire_utils,management,json} mainloop = 1; s();
 
 -- BEGIN bootstrapping
 if true then
@@ -184,11 +190,13 @@ while true do --BEGIN main loop
                 return
             end
 
-            if resdata.c == "wake" then
-                local irr = INTERRUPTS[resdata.name]
+            if resdata.c == "interrupt" then
+                local irr = INTERRUPTS[resdata.echo]
                 if not irr then
-                    send({c="bad_wake",name=resdata.name});
+                    send({c="bad_wake",name=resdata.echo});
                 else
+                    INTERRUPTS[resdata.echo] = nil
+                    --print ("irr resume "..dump(irr))
                     luac_envoke(irr.luac,{
                         type = "event",
                         msg = {
@@ -212,37 +220,3 @@ while true do --BEGIN main loop
     if HARD_SHUTDOWN then return HARD_SHUTDOWN end
     DID_WORK = false;
 end --END main loop
-
---> pairs {globals,safeluac,fifoq,} poll_wire = 1 s();
-local function poll_wire()
-    CURRENT_WIRE,CURRENT_WIRE_NAME = next(WIRES,CURRENT_WIRE);
-    if not CURRENT_WIRE then
-        FULL_LAPS = FULL_LAPS +1;
-        if TRACING then --TODO
-            log("trace","sleep","full lap")
-        end
-        return
-    end
-
-    if (CURRENT_WIRE.steps or 1) <= 0 then return end -- if you need to suspend a luac, please suspend it's wires rather than/as well as frying it.
-    if  CURRENT_WIRE.steps_dec then
-        CURRENT_WIRE.steps = CURRENT_WIRE.steps - 1;
-    end
-
-    local event = CURRENT_WIRE:pop();
-    if not event then return end
-    local tracing = TRACING or luac.tracing;
-    if tracing == true then --TODO make this way better;
-        --TODO assumes everything is digilines, make it accept the other types too
-        log("trace",luac_name(CURRENT_WIRE),"Event: "..dump(event.channel)..": "..dump(event.msg));
-    end
-
-    if CURRENT_WIRE.connections then
-        for ivoke_unit,nickname in pairs(CURRENT_WIRE.connections) do
-            HEAT = HEAT +1;
-            DID_WORK = true
-            FULL_LAPS = 0;
-            luac_envoke(ivoke_unit,event,nickname,CURRENT_WIRE);
-        end
-    end
-end
